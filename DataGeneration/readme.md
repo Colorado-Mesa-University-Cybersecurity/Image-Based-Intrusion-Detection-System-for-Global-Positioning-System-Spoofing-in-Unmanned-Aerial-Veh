@@ -16,9 +16,9 @@ DataGeneration/
 │       ├── split_images.py
 │       └── image-results-spoofing/
 └── SyntheticData/
-    ├── gen_synth.py                  samples the committed synthesizers
+    ├── gen_synth.py                  samples the fitted synthesizers
     ├── 2D/
-    │   ├── SDV/                      synthesizer fit notebook + 3 .pkl + metadata
+    │   ├── SDV/                      fit notebook + metadata; the 3 .pkl are not committed
     │   ├── GAN/GAN.ipynb
     │   └── CGAN/CGAN.ipynb
     └── UAVATTACK/
@@ -30,8 +30,9 @@ DataGeneration/
 ### Synthetic tables
 
 `SDV_Synthetic.ipynb` fits GaussianCopula, CTGAN, and TVAE on the real dataset
-and saves each synthesizer as a `.pkl` beside the notebook (committed, so the
-fit does not have to be repeated). `gen_synth.py` then samples those
+and saves each synthesizer as a `.pkl` beside the notebook. The fitted `.pkl`
+files are not committed; download them from the Drive folder linked in
+`Datasets/readme.md` to skip the fit. `gen_synth.py` then samples those
 synthesizers at 10k / 100k / 1M rows:
 
 ```bash
@@ -60,7 +61,7 @@ pixels, padded to at least `precision` rows. UAV-ATTACK yields 82x64 images
 
 `split_images.py` then moves the test split into `.../data/Test/<class>/` and
 records membership in `split_manifest.json`. It is safe to re-run: it adopts a
-pre-split archive (the UAV-ATTACK download ships split 2,899/723), completes a
+pre-split archive (the UAV-ATTACK images ship split 2,897/725), completes a
 legacy manifest, and refuses to split an already-split pool.
 
 The downloadable image archives are linked from `Datasets/readme.md`. Extract

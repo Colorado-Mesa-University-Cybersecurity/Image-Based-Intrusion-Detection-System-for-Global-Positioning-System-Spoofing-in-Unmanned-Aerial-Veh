@@ -27,8 +27,7 @@ from scratch.
 
 | File pattern | Produced by | Datasets |
 |---|---|---|
-| `spoofing_{gc,ctgan,tvae}_{10000,100000,1000000}.csv` | `DataGeneration/SyntheticData/gen_synth.py`, sampling the committed SDV synthesizers | both |
-| `spoofing-{GaussianCopula,CTGAN,TVAE}-synthetic.csv` | `DataGeneration/SyntheticData/<dataset>/SDV/SDV_Synthetic.ipynb` (10k preview written while fitting) | both |
+| `spoofing_{gc,ctgan,tvae}_{10000,100000,1000000}.csv` | `DataGeneration/SyntheticData/gen_synth.py`, or `SDV_Synthetic.ipynb` while fitting, sampling the SDV synthesizers | both |
 | `syntheticSpoofing_gan_data.csv` | `DataGeneration/SyntheticData/<dataset>/GAN/GAN.ipynb` | both |
 | `syntheticSpoofing_cgan_data.csv` | `DataGeneration/SyntheticData/<dataset>/CGAN/CGAN.ipynb` | both |
 
@@ -38,10 +37,10 @@ order, with integer labels — whichever generator produced it.
 
 Both datasets have all five generators, so each one's synthetic model runs cover
 eleven files: three SDV synthesizers at three sample sizes, plus GAN and CGAN.
-The GAN and CGAN tables for 2D must be generated locally — only the UAV ones
+The GAN and CGAN models for 2D must be generated locally — only the UAV ones
 ship in the repository.
 
-Pre-generated copies of our synthetic tables and of the binary images:
+Pre-generated copies of our synthetic models and of the binary images:
 [Google Drive](https://drive.google.com/drive/folders/1l2LfGwJ8FRzE115wkMUHQRaGiru-SwGv)
 
 The binary images are **not** stored here. They live next to the code that
@@ -60,7 +59,6 @@ Datasets/
 │       ├── spoofing_{gc,ctgan,tvae}_10000.csv    <- generated
 │       ├── spoofing_{gc,ctgan,tvae}_100000.csv   <- generated
 │       ├── spoofing_{gc,ctgan,tvae}_1000000.csv  <- generated
-│       ├── spoofing-{GaussianCopula,CTGAN,TVAE}-synthetic.csv
 │       ├── syntheticSpoofing_gan_data.csv
 │       └── syntheticSpoofing_cgan_data.csv
 └── excel/
@@ -69,7 +67,6 @@ Datasets/
         ├── spoofing_{gc,ctgan,tvae}_10000.csv        <- generated
         ├── spoofing_{gc,ctgan,tvae}_100000.csv       <- generated
         ├── spoofing_{gc,ctgan,tvae}_1000000.csv      <- generated
-        ├── spoofing-{GaussianCopula,CTGAN,TVAE}-synthetic.csv
         ├── syntheticSpoofing_gan_data.csv                 <- generated
         └── syntheticSpoofing_cgan_data.csv                <- generated
 ```
