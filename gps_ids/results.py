@@ -230,10 +230,15 @@ def summarize_seeds(files=None, metrics=None, rows=None):
     rows = load_rows(files) if rows is None else rows
     groups = {}
     for row in rows:
-        key = (row.get("model"), row.get("dataset"), row.get("test_set"))
+        key = (
+            row.get("_dataset_key"),
+            row.get("model"),
+            row.get("dataset"),
+            row.get("test_set"),
+        )
         groups.setdefault(key, []).append(row)
     out = []
-    for (model, dataset, test_set), group in sorted(
+    for (_dskey, model, dataset, test_set), group in sorted(
         groups.items(), key=lambda item: tuple("" if p is None else str(p) for p in item[0])
     ):
         seeds = sorted({str(r.get("seed")) for r in group})
@@ -290,6 +295,89 @@ def format_seed_summary(summary, metric="mcc"):
             )
         )
     return "\n".join(lines)
+
+
+AGGREGATE_KEY = ("_dataset_key", "_source", "model", "dataset", "family", "test_set")
+
+AGGREGATE_VERBATIM = frozenset(
+    (
+        "model",
+        "dataset",
+        "family",
+        "test_set",
+        "seed",
+        "class_names",
+        "worst_class",
+        "parameters",
+        "is_degenerate",
+    )
+)
+
+
+def _is_true(value):
+    return str(value).strip().lower() in ("true", "1", "yes")
+
+
+def aggregate_seeds(rows):
+    import math
+
+    groups = {}
+    order = []
+    for row in rows:
+        key = tuple(row.get(k) for k in AGGREGATE_KEY)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+
+    out = []
+    for key in order:
+        group = groups[key]
+        entry = dict(group[0])
+        values = {}
+        for row in group:
+            for name, raw in row.items():
+                if name in AGGREGATE_VERBATIM or name.startswith("_"):
+                    continue
+                if raw in (None, "", "N/A", "nan"):
+                    continue
+                try:
+                    number = float(str(raw).strip())
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(number):
+                    continue
+                values.setdefault(name, []).append(number)
+
+        for name, found in values.items():
+            mean = sum(found) / len(found)
+            entry[name] = "%.17g" % mean
+            if len(found) > 1:
+                variance = sum((v - mean) ** 2 for v in found) / (len(found) - 1)
+                entry[name + "_std"] = "%.17g" % math.sqrt(variance)
+            else:
+                entry[name + "_std"] = "0"
+
+        seeds = sorted({str(r.get("seed", "")).strip() for r in group if str(r.get("seed", "")).strip()})
+        entry["is_degenerate"] = "True" if any(_is_true(r.get("is_degenerate")) for r in group) else "False"
+        entry["n_degenerate"] = str(sum(1 for r in group if _is_true(r.get("is_degenerate"))))
+        entry["seed"] = "mean(%s)" % ";".join(seeds)
+        entry["seeds"] = ";".join(seeds)
+        entry["n_seeds"] = str(len(seeds))
+        entry["n_runs"] = str(len(group))
+        out.append(entry)
+
+    names = []
+    seen = set()
+    for entry in out:
+        for name in entry:
+            if name not in seen:
+                seen.add(name)
+                names.append(name)
+    for entry in out:
+        for name in names:
+            entry.setdefault(name, "")
+    return out
 
 
 def validate_row(row):

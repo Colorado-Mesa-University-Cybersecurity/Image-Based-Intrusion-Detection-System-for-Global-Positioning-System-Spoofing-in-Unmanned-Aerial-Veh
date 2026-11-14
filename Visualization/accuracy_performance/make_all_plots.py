@@ -31,6 +31,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from gps_ids.results import (
+    aggregate_seeds,
     collapse_variants,
     dataset_short,
     family_for,
@@ -78,8 +79,12 @@ def _as_float(value):
     return f if math.isfinite(f) else None
 
 
+DATASET_DISPLAY = {"uav": "UAV Attack", "2d": "2D"}
+BENIGN_ONLY_TEST_SET = "real_heldout_benign_plus_malicious"
+
+
 def to_arrays(rows, use_overview_labels=True, metric="accuracy"):
-    X, Y, M_raw, D_raw, SRC, DEG, BASE = [], [], [], [], [], [], []
+    X, Y, M_raw, D_raw, SRC, DEG, BASE, KEY = [], [], [], [], [], [], [], []
     for r in rows:
         x = _as_float(r.get("train_time_sec", ""))
         y = _as_float(r.get(metric, ""))
@@ -95,8 +100,14 @@ def to_arrays(rows, use_overview_labels=True, metric="accuracy"):
         D_raw.append(ds_short)
         SRC.append(r.get("_source",""))
         DEG.append(str(r.get(DEGENERATE_COL, "")).strip().lower() in ("true", "1"))
-        BASE.append(_as_float(r.get(BASELINE_COL, "")))
-    return np.array(X), np.array(Y), M_raw, D_raw, SRC, DEG, BASE
+        # The benign-only protocol has its own, much lower majority baseline over a
+        # different test set; it is not comparable with the others on one axis.
+        base_val = _as_float(r.get(BASELINE_COL, ""))
+        if str(r.get("test_set", "")).strip() == BENIGN_ONLY_TEST_SET:
+            base_val = None
+        BASE.append(base_val)
+        KEY.append(r.get("_dataset_key"))
+    return np.array(X), np.array(Y), M_raw, D_raw, SRC, DEG, BASE, KEY
 
 
 # ---- Color + marker styling (GLOBAL & CONSISTENT) ----
@@ -168,7 +179,7 @@ def scatter_figure(rows_subset, out_path, title,
                    use_overview_labels=True,
                    trim_percentiles=None,
                    metric="accuracy", metric_label="Accuracy", ylim=None):
-    X, Y, M, D, _, DEG, BASE = to_arrays(
+    X, Y, M, D, _, DEG, BASE, KEY = to_arrays(
         rows_subset, use_overview_labels=use_overview_labels, metric=metric
     )
     if len(X) == 0:
@@ -202,20 +213,26 @@ def scatter_figure(rows_subset, out_path, title,
                     markeredgecolor="black", markeredgewidth=0.3, alpha=0.9)
 
     if metric == "accuracy":
-        per_ds = {}
-        for d_lbl, b in zip(D, BASE):
-            if b is not None:
-                per_ds.setdefault(d_lbl, []).append(b)
-        groups = {}
-        for d_lbl, vals in per_ds.items():
-            groups.setdefault(round(float(np.median(vals)), 3), []).append(d_lbl)
-        for b, ds_list in sorted(groups.items()):
-            ax.axhline(b, linestyle="--", linewidth=0.9, color="0.35", zorder=0)
-            if len(groups) <= 3:
-                tag = ds_list[0] if len(ds_list) == 1 else f"{len(ds_list)} datasets"
-                ax.annotate(f"{tag} majority baseline {b:.4f}",
-                            xy=(0.004, b), xycoords=("axes fraction", "data"),
-                            va="bottom", ha="left", fontsize=7.5, color="0.25")
+        # Group the majority-class baselines by the real dataset a run belongs to,
+        # not by the dataset label, so the generated tables share their parent's
+        # baseline. One dashed line is drawn per distinct value; the annotation
+        # shows a range when a dataset has more than one (its test sets differ).
+        per_key = {}
+        for k, b in zip(KEY, BASE):
+            if b is not None and k:
+                per_key.setdefault(k, set()).add(round(float(b), 4))
+        for k in sorted(per_key):
+            vals = sorted(per_key[k])
+            for b in vals:
+                ax.axhline(b, linestyle="--", linewidth=0.9, color="0.35", zorder=0)
+            name = DATASET_DISPLAY.get(k, k)
+            if len(vals) == 1:
+                text = f"{name} majority baseline {vals[0]:.4f}"
+            else:
+                text = f"{name} majority baseline {vals[0]:.4f}\u2013{vals[-1]:.4f}"
+            ax.annotate(text,
+                        xy=(0.004, vals[-1]), xycoords=("axes fraction", "data"),
+                        va="bottom", ha="left", fontsize=7.5, color="0.25")
 
     deg_idx = [i for i, g in enumerate(DEG) if g]
     if deg_idx:
@@ -255,7 +272,7 @@ def scatter_figure(rows_subset, out_path, title,
     if deg_idx:
         dataset_handles.append(Line2D([0],[0], marker="x", linestyle="", color="crimson",
                                       markeredgewidth=1.4, markersize=7))
-        dataset_labels.append("degenerate (one class predicted)")
+        dataset_labels.append("degenerate (not every class predicted)")
     ax.legend(dataset_handles, dataset_labels, title="dataset",
               loc="lower left", bbox_to_anchor=(1.02,0.00),
               frameon=True, ncol=ds_ncol, columnspacing=0.8, handletextpad=0.4)
@@ -343,7 +360,7 @@ def main():
     print("Reading:")
     for f in files:
         print(f"  {f}")
-    rows_all = load_rows(files)
+    rows_all = aggregate_seeds(load_rows(files))
 
     # Build consistent colors/markers for both label modes:
     # - overview (collapsed labels)

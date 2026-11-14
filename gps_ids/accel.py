@@ -12,10 +12,51 @@ def _check(backend):
         )
 
 
+def _asarray(X):
+    import numpy as np
+
+    if hasattr(X, "to_numpy"):
+        return np.ascontiguousarray(X.to_numpy())
+    return X
+
+
+_CUML_SVC = None
+_CUML_BASE = None
+
+
 def _cuml_svc():
+    global _CUML_SVC, _CUML_BASE
     from cuml.svm import SVC
 
-    return SVC
+    if _CUML_SVC is None or _CUML_BASE is not SVC:
+
+        class SVCWithoutProba(SVC):
+            @property
+            def predict_proba(self):
+                raise AttributeError("predict_proba requires probability=True")
+
+            def fit(self, X, y=None, sample_weight=None, **kwargs):
+                return super().fit(
+                    _asarray(X), y, sample_weight=sample_weight, **kwargs
+                )
+
+            def predict(self, X, **kwargs):
+                return super().predict(_asarray(X), **kwargs)
+
+            def decision_function(self, X, **kwargs):
+                return super().decision_function(_asarray(X), **kwargs)
+
+        SVCWithoutProba.__module__ = __name__
+        SVCWithoutProba.__qualname__ = "SVCWithoutProba"
+        _CUML_BASE = SVC
+        _CUML_SVC = SVCWithoutProba
+    return _CUML_SVC
+
+
+def __getattr__(name):
+    if name == "SVCWithoutProba":
+        return _cuml_svc()
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
 
 
 def resolve_svc(backend="auto"):

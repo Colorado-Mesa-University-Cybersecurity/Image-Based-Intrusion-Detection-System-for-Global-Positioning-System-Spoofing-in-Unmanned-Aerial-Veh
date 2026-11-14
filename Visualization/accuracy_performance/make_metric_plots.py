@@ -107,7 +107,7 @@ def fig_accuracy_vs_mcc(rows):
     labels = list(seen_ds.keys())
     handles.append(Line2D([0], [0], marker="o", linestyle="", markerfacecolor="crimson",
                           markeredgecolor="black", markersize=6))
-    labels.append("degenerate (one class predicted)")
+    labels.append("degenerate (not every class predicted)")
     if not annotate:
         handles.append(Line2D([0], [0], linestyle="--", color="0.4", linewidth=0.9))
         labels.append("majority baseline")
